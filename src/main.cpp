@@ -19,6 +19,8 @@ boolean pumpState = false; //boolean for if the relay is active or not. start as
 unsigned long psiReadInterval = 1000; //interval for reading psi in the smoothing loop
 int pswSmoothCount = 10; //smooth psi readings over x psiReadInterval
 int pswSmoothCurCount = 0; //Counter for keeping track of smooth interations
+unsigned long pumpOverRunStop = 300000; //milliseconds for max run time on the pump
+unsigned long pumpMinInterval = 600000; //milliseconds for min pump run intervals
 
 //Variables for mister  //Activate relay if psi is too low and flot returns 0
 
@@ -112,19 +114,23 @@ void loop() {
     }
   }
 
+  Serial.print(avgPSI);
+  Serial.print("\n");
 
   //Get float switch status
   lowWater = floatStatus();
 
-  //Activate relay if psi is too low and flot returns 0
+  //Activate relay if psi is too low and lowWater returns false
   //if ((avgPSI < lowLimit) && (pumpState == false) && (lowWater == false) && ((currentMillis - pumpLastStartTimer) > 600000))  {
   if ((avgPSI < lowLimit) && (pumpState == false) && (lowWater == false))  {
-    digitalWrite(pswRelayPin, LOW);
-    pumpLastStartTimer = currentMillis; //set time the pump last turned on
-    pumpRunTimer = currentMillis; //set time pump turned on to make sure it doesn't exceed max runtime
-    pumpState = true;
+    if ((currentMillis < pumpMinInterval) || ((currentMillis - pumpLastStartTimer) > pumpMinInterval)) {
+      digitalWrite(pswRelayPin, LOW);
+      pumpLastStartTimer = currentMillis; //set time the pump last turned on
+      pumpRunTimer = currentMillis; //set time pump turned on to make sure it doesn't exceed max runtime
+      pumpState = true;
+    }
   //} else if (((avgPSI > highLimit) || (lowWater = true)) && pumpState == true) || ((currentMillis - pumpRunTimer) > 300000)) {
-  } else if ((avgPSI > highLimit) || ((pumpState == true) && (lowWater == true))) {
+  } else if ((avgPSI > highLimit) || ((pumpState == true) && (lowWater == true)) || ((currentMillis - pumpRunTimer) > pumpOverRunStop)) {
     digitalWrite(pswRelayPin, HIGH);
     pumpState = false;
   }
