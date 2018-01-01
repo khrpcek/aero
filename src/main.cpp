@@ -7,7 +7,6 @@
 
 //Variables for pressure switch
 int floatSwitchPin = 2; //float switch digital pin
-boolean lowWater; //Boolean for float sensor
 int pswRelayPin = 3; //relay digital pin
 int psiTransPin = A1; //
 int lowLimit = 65; //psi low lowLimit
@@ -36,6 +35,12 @@ unsigned long psiIntervalTimer = 0; //timer for psi smoothing
 unsigned long pumpRunTimer = 0; //counts time pump is running to not exceed X min
 unsigned long pumpLastStartTimer = 0; //used to count time between pump runs
 
+//Float smoother Variables
+boolean lowWaterInst = true; //instantaneous lowWater sensor value before smoothing. Set to true by default so the program has time to smooth and not turn on the pump right away
+boolean lowWater; //Boolean for float sensor
+int lowWaterSmoothCounter = 0;
+int lowWaterTCount = 0;
+int lowWaterFCount = 0;
 
 //Timers for mister
 unsigned long mistIntervalPrev = 0; //millis since last mist activation
@@ -117,8 +122,27 @@ void loop() {
   Serial.print(avgPSI);
   Serial.print("\n");
 
-  //Get float switch status
-  lowWater = floatStatus();
+  //Get instantaneous float switch status
+  lowWaterInst = floatStatus();
+
+  if (lowWaterInst == true) {
+    lowWaterTCount = lowWaterTCount + 1;
+  } else if (lowWaterInst == false) {
+    lowWaterFCount = lowWaterFCount + 1;
+  }
+  if (lowWaterSmoothCounter < 101) {
+    lowWaterSmoothCounter = lowWaterSmoothCounter + 1;
+  } else if (lowWaterSmoothCounter == 100) {
+    if (lowWaterTCount > 60) {
+      lowWater = true;
+    } else if (lowWaterFCount > 60) {
+      lowWater = false;
+    }
+    //Reset all lowWater counters for next set
+    lowWaterTCount = 0;
+    lowWaterFCount = 0;
+    lowWaterSmoothCounter = 0;
+  }
 
   //Activate relay if psi is too low and lowWater returns false
   //if ((avgPSI < lowLimit) && (pumpState == false) && (lowWater == false) && ((currentMillis - pumpLastStartTimer) > 600000))  {
